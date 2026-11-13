@@ -25,11 +25,13 @@ public class AdminApiControllerTests extends AbstractTestsBase {
     private AdminApiController controller;
     private Map<Long, WorkspaceMetadata> workspaces;
     private List<Long> deletedFromSearchIndex;
+    private List<Long> metadataLookups;
 
     @BeforeEach
     void setUp() {
         workspaces = new HashMap<>();
         deletedFromSearchIndex = new ArrayList<>();
+        metadataLookups = new ArrayList<>();
 
         controller = new AdminApiController();
         controller.setWorkspaceComponent(new MockWorkspaceComponent() {
@@ -40,6 +42,7 @@ public class AdminApiControllerTests extends AbstractTestsBase {
 
             @Override
             public WorkspaceMetadata getWorkspaceMetadata(long workspaceId) {
+                metadataLookups.add(workspaceId);
                 return workspaces.get(workspaceId);
             }
 
@@ -178,6 +181,15 @@ public class AdminApiControllerTests extends AbstractTestsBase {
 
         assertThrows(NotFoundApiException.class, () -> controller.deleteWorkspace(99, ADMIN_API_KEY));
         assertTrue(deletedFromSearchIndex.isEmpty());
+    }
+
+    @Test
+    void deleteWorkspace_DoesNotLookUpTheMetadataOfAWorkspaceThatDoesNotExist() {
+        // with file storage, that lookup creates an empty directory for the ID
+        configureWithAdminApiKey();
+
+        assertThrows(NotFoundApiException.class, () -> controller.deleteWorkspace(99, ADMIN_API_KEY));
+        assertFalse(metadataLookups.contains(99L));
     }
 
     @Test

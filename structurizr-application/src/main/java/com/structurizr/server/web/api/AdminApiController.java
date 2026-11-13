@@ -99,8 +99,12 @@ public class AdminApiController extends AbstractController {
     ) {
         authoriseRequest(apiKey);
 
-        WorkspaceMetadata workspaceMetadata = workspaceComponent.getWorkspaceMetadata(workspaceId);
-        if (workspaceMetadata == null) {
+        // check against the list rather than calling getWorkspaceMetadata(workspaceId): with file storage, looking up
+        // the metadata of a workspace that does not exist creates an empty directory for it, which then pushes the
+        // next ID created by POST /api/workspace past it
+        boolean exists = workspaceComponent.getWorkspaces().stream()
+                .anyMatch(workspaceMetadata -> workspaceMetadata.getId() == workspaceId);
+        if (!exists) {
             throw new NotFoundApiException();
         }
 
