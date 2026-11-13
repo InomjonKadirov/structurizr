@@ -1,0 +1,51 @@
+# Fork addition (branch "inam"): keeps "main" equal to structurizr/structurizr main, then proposes the
+# changes to "inam" as a pull request. Nothing is merged automatically.
+#
+# Secret UPSTREAM_SYNC_TOKEN (recommended): a personal access token with "repo" and "workflow" scopes.
+#   - Without "workflow" scope, syncing fails whenever upstream changes files under .github/workflows.
+#   - Pull requests opened with the default GITHUB_TOKEN do not trigger the CI workflow.
+# Falls back to GITHUB_TOKEN when the secret is not set.
+
+name: inam - upstream sync
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"   # Mondays 04:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'InomjonKadirov/structurizr'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.UPSTREAM_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Fast-forward main from upstream
+        run: gh api -X POST "repos/$REPO/merge-upstream" -f branch=main --jq '.message'
+
+      - name: Open a pull request main -> inam
+        run: |
+          ahead=$(gh api "repos/$REPO/compare/inam...main" --jq '.ahead_by')
+          echo "main is $ahead commit(s) ahead of inam"
+          if [ "$ahead" = "0" ]; then
+            exit 0
+          fi
+
+          existing=$(gh pr list --repo "$REPO" --base inam --head main --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "Pull request #$existing is already open"
+            exit 0
+          fi
+
+          gh pr create --repo "$REPO" --base inam --head main \
+            --title "Sync upstream main ($(date -u +%Y-%m-%d))" \
+            --body "Brings $ahead upstream commit(s) from structurizr/structurizr main into inam. Merge (do not rebase) after CI passes, then bump inam/VERSION if this goes into a release."

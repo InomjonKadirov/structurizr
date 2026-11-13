@@ -1,0 +1,7 @@
+# Fork addition (branch "inam"): build context for inam/Dockerfile.
+.git
+.github
+.idea
+**/target
+**/build
+*.log

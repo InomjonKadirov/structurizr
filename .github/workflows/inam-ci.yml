@@ -1,0 +1,37 @@
+# Fork addition (branch "inam"): builds and tests the fork, and checks that the Docker image builds.
+# Upstream's maven.yml only runs for "main", so this covers "inam" and pull requests into it.
+
+name: inam - CI
+
+on:
+  push:
+    branches: [ "inam" ]
+  pull_request:
+    branches: [ "inam" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+      - name: Build and test
+        run: ./mvnw -B -ntp -DexcludedGroups=IntegrationTest -Dapp.revision="$(cat inam/VERSION)" package
+
+  image:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image (not pushed)
+        run: docker buildx build -f inam/Dockerfile --build-arg APP_REVISION="$(cat inam/VERSION)" -t structurizr-inam:"$(cat inam/VERSION)" .
